@@ -139,14 +139,14 @@
 #define ZA_OFFSET_H      0x7D
 #define ZA_OFFSET_L      0x7E
 
-
+#define PI 3.14159265358979323846f
 
 
 
 
 extern uint8_t Ascale, Gscale, Mscale, Mmode;
 extern float aRes, gRes, mRes;
-extern float PI, GyroMeasError, beta, GyroMeasDrift, zeta;
+extern float GyroMeasError, beta, GyroMeasDrift, zeta;
 extern float pitch, yaw, roll;
 extern float q[4];
 extern float deltat;

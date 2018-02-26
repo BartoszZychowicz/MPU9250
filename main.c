@@ -56,16 +56,20 @@ void tim2_ititialize(){
 	TIM_TimeBaseStructInit(&tim);
 	tim.TIM_CounterMode = TIM_CounterMode_Up;
 	tim.TIM_Prescaler = 6400 - 1;
-	//tim.TIM_Period = 65000;
 	TIM_TimeBaseInit(TIM2, &tim);
 	TIM_Cmd(TIM2, ENABLE);
 }
 
-int main(void)
-{
-
+void i2c_initialize(){
 	I2C_InitTypeDef i2c;
+	I2C_StructInit(&i2c);
+	i2c.I2C_Mode = I2C_Mode_I2C;
+	i2c.I2C_ClockSpeed = 100000;
+	I2C_Init(I2C1, &i2c);
+	I2C_Cmd(I2C1, ENABLE);
+}
 
+void stm_initialize(){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
@@ -76,14 +80,14 @@ int main(void)
 	usart_initialize();
 	nvic_initialize();
 	tim2_ititialize();
-
-	I2C_StructInit(&i2c);
-	i2c.I2C_Mode = I2C_Mode_I2C;
-	i2c.I2C_ClockSpeed = 100000;
-	I2C_Init(I2C1, &i2c);
-	I2C_Cmd(I2C1, ENABLE);
+	i2c_initialize();
 
 	SysTick_Config(SystemCoreClock / 1000);
+}
+
+int main(void)
+{
+	stm_initialize();
 
 	//MPU9250
 
@@ -180,27 +184,17 @@ int main(void)
 
 	int counter_wysw = 0;
 
-
-	/*printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
-			printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
-			printf("Magnetometer sensitivity is %f LSB/G \n\r", 1.0f/mRes);*/
 	magbias[0] = -73.48;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-	magbias[1] = 526.92;  // User environmental x-axis correction in milliGauss
-	magbias[2] = -425.04;  // User environmental x-axis correction in milliGauss
-
-	//magbias[0] = hardiron_correction[0];
-	//magbias[1] = hardiron_correction[1];
-	//magbias[2] = hardiron_correction[2];
+	magbias[1] = 526.92;  // User environmental y-axis correction in milliGauss
+	magbias[2] = -425.04;  // User environmental z-axis correction in milliGauss
 
 	while(1) {
-
-
 
 		// If intPin goes high, all data registers have new data
 		if(mpu_read_reg(MPU9250_ADDR, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
 			mpu_ReadAccelData(accelCount);  // Read the x/y/z adc values
-			// Now we'll calculate the accleration value into actual g's
+			// Now we'll calculate the acceleration value into actual g's
 			ax = (float)accelCount[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
 			ay = (float)accelCount[1]*aRes - accelBias[1];
 			az = (float)accelCount[2]*aRes - accelBias[2];
@@ -220,18 +214,6 @@ int main(void)
 			mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
 			my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];
 			mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];
-
-
-
-			//counter_wysw++;
-			/*if (counter_wysw >= 60){
-				printf("Accel: %f %f %f   ", ax, ay, az);
-				printf("Gyro: %f %f %f   ", gx, gy, gz);
-				printf("Mag: %f %f %f\n", mx, my, mz);
-				counter_wysw = 0;
-			}*/
-
-
 
 			TIM_Cmd(TIM2, DISABLE);
 			t = TIM_GetCounter(TIM2);

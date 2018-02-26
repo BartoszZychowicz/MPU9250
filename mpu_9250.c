@@ -3,11 +3,10 @@
 #include <stdio.h>
 #include "delay.h"
 
-float PI = 3.14159265358979323846f;
-float GyroMeasError = 3.14159265358979323846f * (60.0f / 180.0f);     // gyroscope measurement error in rads/s (start at 60 deg/s), then reduce after ~10 s to 3
-float beta = sqrt(3.0f / 4.0f) * (3.14159265358979323846f * (60.0f / 180.0f));  // compute beta
-float GyroMeasDrift = 3.14159265358979323846f * (1.0f / 180.0f);      // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
-float zeta = sqrt(3.0f / 4.0f) * (3.14159265358979323846f * (1.0f / 180.0f));  // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+float GyroMeasError = PI * (60.0f / 180.0f);     // gyroscope measurement error in rads/s (start at 60 deg/s), then reduce after ~10 s to 3
+float beta = sqrt(3.0f / 4.0f) * (PI * (60.0f / 180.0f));  // compute beta
+float GyroMeasDrift = PI * (1.0f / 180.0f);      // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
+float zeta = sqrt(3.0f / 4.0f) * (PI * (1.0f / 180.0f));  // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
 
 
 enum Ascale {
@@ -156,24 +155,6 @@ int16_t mpu_read_value(uint8_t device_addr, uint8_t reg)
 	mpu_read(device_addr, reg, &value, sizeof(value));
 	return value;
 }
-
-/*void mpu_read_multiple(uint8_t device_addr, uint8_t first_reg , uint8_t * destination , uint8_t count){
-	int i;
-	mpu_set_reg(device_addr, first_reg);
-	I2C_GenerateSTART(I2C1, ENABLE);
-	while (I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT) != SUCCESS);
-	I2C_AcknowledgeConfig(I2C1, ENABLE);
-	I2C_Send7bitAddress(I2C1, device_addr, I2C_Direction_Receiver);
-	while (I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED) != SUCCESS);
-	for (i = 0; i < count - 1; i++) {
-		while(I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED) != SUCCESS);
-		destination[i] = I2C_ReceiveData(I2C1);
-	}
-	I2C_AcknowledgeConfig(I2C1, DISABLE);
-	I2C_GenerateSTOP(I2C1, ENABLE);
-	while(I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED) != SUCCESS);
-	destination[i] = I2C_ReceiveData(I2C1);
-}*/
 
 void mpu_reset(){
 	mpu_write_reg(MPU9250_ADDR, PWR_MGMT_1, 0x80);
