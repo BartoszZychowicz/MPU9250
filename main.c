@@ -8,12 +8,11 @@
 
 
 // ZMIENNE GLOBALNE
-
-
 float pitch, yaw, roll;
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
 float deltat = 0.0f;                             // integration interval for both filter schemes
 float magCalibration[3] = {0.0};
+
 
 void usart_initialize(){			//ENABLE UART i przerwania
 	USART_InitTypeDef uart;
@@ -94,7 +93,6 @@ int main(void)
 	//int16_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
 	//int16_t avg_temp_gyro[3], avg_temp_accel[3];
 	int16_t temp[3];
-	//int16_t rest = 0;
 	uint8_t FS = 0;
 	//uint8_t selfTest[6];
 	//float factoryTrim[6] = {0.0};
@@ -110,32 +108,24 @@ int main(void)
 	//float hardiron_correction[3] = {0.0};
 	//float softiron_correction[3] = {0.0};
 
-	// =======================TESTY KOMUNIKACJI===========================
+	// =======================TEST KOMUNIKACJI===========================
 
 	printf("Wyszukiwanie akcelerometru...\n");
 
-	uint8_t who_am_i = mpu_read_reg(MPU9250_ADDR, WHO_AM_I);
+	uint8_t who_am_i = I2CReadReg(MPU9250_ADDR, WHO_AM_I);
 	if (who_am_i == 0x71) {
 		printf("Znaleziono akcelerometr MPU9250!\n");
 	}
 	else {
 		printf("Niepoprawna odpowiedz ukladu(0x%02X)\n", who_am_i);
 	}
-	/*
-	printf("Wyszukiwanie magnetometru...\n");
 
-	who_am_i = 0;
-	who_am_i = mpu_read_reg(AK8963_ADDRESS, AK8963_WHO_AM_I);
-	if (who_am_i == 0x48) {
-		printf("Znaleziono magnetometr AK8963!\n");
-	}
-	else {
-		printf("Niepoprawna odpowiedz ukladu(0x%02X)\n", who_am_i);
-	}
+	// ============================RESET MPU=============================
 
-	 */
 	printf("Reset MPU9250 \n");
 	mpu_reset();
+
+	// ===========================KALIBRACJA MPU==========================
 
 	mpu_calibrate(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
 	printf("x gyro bias = %f\n\r", gyroBias[0]);
@@ -145,23 +135,15 @@ int main(void)
 	printf("y accel bias = %f\n\r", accelBias[1]);
 	printf("z accel bias = %f\n\r", accelBias[2]);
 	delay_ms(2000);
+
+	//
+
 	mpu_initialize();
 
 	//========================================================================
 
-
-	mpu_write_reg(MPU9250_ADDR, SMPLRT_DIV, 0x00); // Set gyro sample rate to 1 kHz
-	mpu_write_reg(MPU9250_ADDR, CONFIG, 0x02); // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
-	mpu_write_reg(MPU9250_ADDR, GYRO_CONFIG, 1<FS); // Set full scale range for the gyro to 250 dps
-	mpu_write_reg(MPU9250_ADDR, ACCEL_CONFIG2, 0x02); // Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
-	mpu_write_reg(MPU9250_ADDR, ACCEL_CONFIG, 1<FS); // Set full scale range for the accelerometer to 2
-
-	delay_ms(50);
-
-	getAres(); // Get accelerometer sensitivity
-	getGres(); // Get gyro sensitivity
-	getMres(); // Get magnetometer sensitivity
 	initAK8963(magCalibration);
+
 	printf("%f %f %f", magCalibration[0], magCalibration[1], magCalibration[2]);
 	printf("AK8963 initialized for active data mode....\n\r"); // Initialize device for active mode read of magnetometer
 	printf("Accelerometer full-scale range = %f  g\n\r", 2.0f*(float)(1<<Ascale));
@@ -170,6 +152,10 @@ int main(void)
 	if(Mscale == 1) printf("Magnetometer resolution = 16  bits\n\r");
 	if(Mmode == 2) printf("Magnetometer ODR = 8 Hz\n\r");
 	if(Mmode == 6) printf("Magnetometer ODR = 100 Hz\n\r");
+
+	getAres(); // Get accelerometer sensitivity
+	getGres(); // Get gyro sensitivity
+	getMres(); // Get magnetometer sensitivity
 
 	//magcalMPU9250(hardiron_correction, softiron_correction);
 
@@ -191,7 +177,7 @@ int main(void)
 	while(1) {
 
 		// If intPin goes high, all data registers have new data
-		if(mpu_read_reg(MPU9250_ADDR, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+		if(I2CReadReg(MPU9250_ADDR, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
 			mpu_ReadAccelData(accelCount);  // Read the x/y/z adc values
 			// Now we'll calculate the acceleration value into actual g's

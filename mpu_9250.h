@@ -152,14 +152,13 @@ extern float q[4];
 extern float deltat;
 extern float magCalibration[3];
 
-extern void mpu_write(uint8_t device_addr, uint8_t reg, const void* data, int size);
-extern void mpu_read(uint8_t device_addr, uint8_t reg, void* data, int size);
+extern void I2CWrite(uint8_t device_addr, uint8_t reg, const void* data, int size);
+extern void I2CRead(uint8_t device_addr, uint8_t reg, void* data, int size);
 
-extern void mpu_write_reg(uint8_t device_addr, uint8_t reg, uint8_t value);
-extern uint8_t mpu_read_reg(uint8_t device_addr, uint8_t reg);
-extern int16_t mpu_read_value(uint8_t device_addr, uint8_t reg);
+extern void I2CWriteReg(uint8_t device_addr, uint8_t reg, uint8_t value);
+extern uint8_t I2CReadReg(uint8_t device_addr, uint8_t reg);
+extern int16_t I2CReadValue(uint8_t device_addr, uint8_t reg);
 extern void mpu_reset();
-//extern void mpu_read_multiple(uint8_t device_addr, uint8_t first_reg , uint8_t * destination , uint8_t count);
 
 extern void getAres();
 extern void getGres();
