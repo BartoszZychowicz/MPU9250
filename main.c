@@ -12,7 +12,18 @@ float pitch, yaw, roll;
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
 float deltat = 0.0f;                             // integration interval for both filter schemes
 float magCalibration[3] = {0.0};
+volatile char I2CWatchDog = 0;
+uint8_t I2CResult = 0;
+uint8_t I2CErrorCount = 0;
 
+void TIM3_IRQHandler()
+{
+	if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
+	{
+		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+		I2CWatchDog = 1;
+	}
+}
 
 void usart_initialize(){			//ENABLE UART i przerwania
 	USART_InitTypeDef uart;
@@ -28,6 +39,12 @@ void nvic_initialize(){
 	nvic.NVIC_IRQChannel = USART2_IRQn;
 	nvic.NVIC_IRQChannelPreemptionPriority = 0;
 	nvic.NVIC_IRQChannelSubPriority = 0;
+	nvic.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&nvic);
+
+	nvic.NVIC_IRQChannel = TIM3_IRQn;
+	nvic.NVIC_IRQChannelPreemptionPriority = 1;
+	nvic.NVIC_IRQChannelSubPriority = 1;
 	nvic.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&nvic);
 }
@@ -50,13 +67,23 @@ void gpio_initialize(){
 	GPIO_Init(GPIOB, &gpio);
 }
 
-void tim2_ititialize(){
+void tim2_initialize(){
 	TIM_TimeBaseInitTypeDef tim;
 	TIM_TimeBaseStructInit(&tim);
 	tim.TIM_CounterMode = TIM_CounterMode_Up;
 	tim.TIM_Prescaler = 6400 - 1;
 	TIM_TimeBaseInit(TIM2, &tim);
 	TIM_Cmd(TIM2, ENABLE);
+}
+
+void tim3_initialize(){					//timeout I2C
+	TIM_TimeBaseInitTypeDef tim;
+	TIM_TimeBaseStructInit(&tim);
+	tim.TIM_CounterMode = TIM_CounterMode_Up;
+	tim.TIM_Prescaler = 64000 - 1;
+	tim.TIM_Period = 50;
+	TIM_TimeBaseInit(TIM3, &tim);
+	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 }
 
 void i2c_initialize(){
@@ -74,11 +101,13 @@ void stm_initialize(){
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 
 	gpio_initialize();
 	usart_initialize();
 	nvic_initialize();
-	tim2_ititialize();
+	tim2_initialize();
+	tim3_initialize();
 	i2c_initialize();
 
 	SysTick_Config(SystemCoreClock / 1000);
@@ -88,15 +117,21 @@ int main(void)
 {
 	stm_initialize();
 
-	//MPU9250
+	// =================NIEUZYWANE====================
 
 	//int16_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
 	//int16_t avg_temp_gyro[3], avg_temp_accel[3];
-	int16_t temp[3];
-	uint8_t FS = 0;
 	//uint8_t selfTest[6];
 	//float factoryTrim[6] = {0.0};
 	//float ResultST[6] = {0.0};
+	//float hardiron_correction[3] = {0.0};
+	//float softiron_correction[3] = {0.0};
+	//uint8_t FS = 0;
+
+	//================================================
+
+	int16_t temp[3];
+	int counter_wysw = 0;
 
 	float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};
 
@@ -105,8 +140,7 @@ int main(void)
 	int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
 	float ax, ay, az, gx, gy, gz, mx, my, mz;
 	int t = 0;
-	//float hardiron_correction[3] = {0.0};
-	//float softiron_correction[3] = {0.0};
+
 
 	// =======================TEST KOMUNIKACJI===========================
 
@@ -168,14 +202,12 @@ int main(void)
 	mpu_ReadMagData(temp);
 	printf("Mag: %i %i %i\n", temp[0], temp[1], temp[2]);
 
-	int counter_wysw = 0;
-
 	magbias[0] = -73.48;  // User environmental x-axis correction in milliGauss, should be automatically calculated
 	magbias[1] = 526.92;  // User environmental y-axis correction in milliGauss
 	magbias[2] = -425.04;  // User environmental z-axis correction in milliGauss
 
 	while(1) {
-
+		printf("%d", I2CWatchDog);
 		// If intPin goes high, all data registers have new data
 		if(I2CReadReg(MPU9250_ADDR, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
@@ -195,8 +227,6 @@ int main(void)
 			// Calculate the magnetometer values in milliGauss
 			// Include factory calibration per data sheet and user environmental corrections
 
-			//printf("Mag: %i %i %i\n", magCount[0], magCount[1], magCount[2]);
-
 			mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
 			my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];
 			mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];
@@ -204,7 +234,6 @@ int main(void)
 			TIM_Cmd(TIM2, DISABLE);
 			t = TIM_GetCounter(TIM2);
 			deltat = (float)t/10000.0;
-
 
 			MadgwickQuaternionUpdate(-ay, -ax, az, gy*PI/180.0f, gx*PI/180.0f, -gz*PI/180.0f,  mx,  my, mz);
 
@@ -231,9 +260,21 @@ int main(void)
 				counter_wysw = 0;
 			}
 
+			if(I2CResult == 1){			//kontrola bledow I2C
+				printf("Wystapily bledy timeout I2C!\n");
+				I2CErrorCount += 1;
+				I2CResult = 0;
+			}
+			else{
+				I2CErrorCount = 0;
+			}
+			if(I2CErrorCount >= 10){
+				I2CErrorCount = 0;
+				resetI2C();
+				printf("Wykonano reset I2C!\n\n\n\n\n\n\n\n\n");
+			}
+
 		}
 	}
 }
-
-//}
 
