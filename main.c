@@ -141,6 +141,10 @@ int main(void)
 	float ax, ay, az, gx, gy, gz, mx, my, mz;
 	int t = 0;
 
+	//ZMIENNE ENKODERA
+	float angleValue = 0;
+	uint8_t result = 0;
+
 
 	// =======================TEST KOMUNIKACJI===========================
 
@@ -207,7 +211,6 @@ int main(void)
 	magbias[2] = -425.04;  // User environmental z-axis correction in milliGauss
 
 	while(1) {
-		printf("%d", I2CWatchDog);
 		// If intPin goes high, all data registers have new data
 		if(I2CReadReg(MPU9250_ADDR, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
@@ -231,14 +234,14 @@ int main(void)
 			my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];
 			mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];
 
-			TIM_Cmd(TIM2, DISABLE);
+			TIM_Cmd(TIM2, DISABLE);	//czas cyklu dla MPU
 			t = TIM_GetCounter(TIM2);
 			deltat = (float)t/10000.0;
 
 			MadgwickQuaternionUpdate(-ay, -ax, az, gy*PI/180.0f, gx*PI/180.0f, -gz*PI/180.0f,  mx,  my, mz);
 
 			TIM_SetCounter(TIM2, 0);
-			TIM_Cmd(TIM2, ENABLE);
+			TIM_Cmd(TIM2, ENABLE);	//odliczanie czasu cyklu dla MPU
 
 			yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
 			pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
@@ -258,6 +261,22 @@ int main(void)
 				printf("mx, my, mz values: %f %f %f \n\n", mx, my, mz);
 				printf("Yaw, Pitch, Roll: %f %f %f\n\n\r", yaw, pitch, roll);
 				counter_wysw = 0;
+
+				result = AS_readEncoder(&angleValue);
+				switch(result){
+				case 0:
+					printf("Odczyt nieudany!\n");
+					break;
+				case 1:
+					printf("%f\n", angleValue);
+					break;
+				case 2:
+					printf("Magnes za daleko!\n");
+					break;
+				case 3:
+					printf("Magnes za blisko!\n");
+					break;
+				}
 			}
 
 			if(I2CResult == 1){			//kontrola bledow I2C

@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <math.h>
 
+//ADRES ENKODERA
+
+#define AS5600_ADDR	0x36<<1
 
 //MAGNETOMETR - REJESTRY
 #define AK8963_ADDRESS   0x0C<<1
@@ -177,6 +180,10 @@ extern void initAK8963(float * destination);
 extern void magcalMPU9250(float * dest1, float * dest2);
 
 extern void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
+
+//FUNKCJA ENKODERA
+
+extern uint8_t AS_readEncoder(float *angleValue);
 
 
 
